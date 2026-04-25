@@ -142,6 +142,7 @@ class SnakeGame:
 
         self.stats.elapsed_ms += dt
         self.stats.floor_elapsed_ms += dt
+        self.tick_accumulator += dt
 
         if not self.stats.has_freeze_time():
             for food in self.foods[:]:
