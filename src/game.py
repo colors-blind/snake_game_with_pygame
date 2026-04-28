@@ -5,11 +5,11 @@ from random import random
 
 from .config import GAMEPLAY, GRID, SCREEN, ROGUELIKE
 from .events import GameState, MapTileType, EventType
-from .models import RunStats, GameMap, Food, Vec2
+from .models import RunStats, GameMap, Food, Vec2, Snake
 from .systems import (
     DirectionInputBuffer, RuleSystem, SaveSystem, SpawnSystem,
     MapGenerator, UpgradeSystem, EventSystem, DifficultySystem,
-    build_snake_with_bonus
+    build_snake_with_bonus, build_ai_snake, AISystem
 )
 from .ui import UiRenderer
 
@@ -26,11 +26,13 @@ class SnakeGame:
         self.input_buffer = DirectionInputBuffer()
 
         self.snake = build_snake_with_bonus(0)
+        self.ai_snake: Optional[Snake] = None
         self.game_map = GameMap()
         self.foods: list[Food] = []
         self.stats = RunStats(high_score=SaveSystem.load_high_score())
 
         self.tick_accumulator = 0
+        self.ai_tick_accumulator = 0
         self.running = True
         
         self._init_new_run()
@@ -41,10 +43,13 @@ class SnakeGame:
             high_score=self.stats.high_score,
             next_event_ms=EventSystem.roll_next_event_time(0)
         )
+        self.ai_snake = None
+        self.ai_tick_accumulator = 0
         self._generate_new_floor()
 
     def _generate_new_floor(self) -> None:
         self.snake = build_snake_with_bonus(self.stats.upgrades.initial_length_bonus)
+        self.ai_snake = build_ai_snake(self.snake)
         self.game_map = MapGenerator.generate(self.stats.floor, self.snake)
         self.stats.floor_elapsed_ms = 0
         self.stats.has_immunity_this_floor = self.stats.upgrades.immunity_first_hit
@@ -53,6 +58,7 @@ class SnakeGame:
         self._spawn_initial_foods()
         self.input_buffer = DirectionInputBuffer()
         self.tick_accumulator = 0
+        self.ai_tick_accumulator = 0
         
         self.stats.add_log(f"进入第 {self.stats.floor} 层")
 
@@ -68,7 +74,7 @@ class SnakeGame:
             self._update(dt)
             self.renderer.draw(
                 self.state, self.snake, self.foods, self.stats, 
-                self.game_map
+                self.game_map, self.ai_snake
             )
             pygame.display.flip()
         pygame.quit()
@@ -143,6 +149,7 @@ class SnakeGame:
         self.stats.elapsed_ms += dt
         self.stats.floor_elapsed_ms += dt
         self.tick_accumulator += dt
+        self.ai_tick_accumulator += dt
 
         if not self.stats.has_freeze_time():
             for food in self.foods[:]:
@@ -179,6 +186,12 @@ class SnakeGame:
         while self.tick_accumulator >= tick_ms:
             self.tick_accumulator -= tick_ms
             if not self._step():
+                return
+        
+        ai_tick_ms = int(tick_ms * 1.5)
+        while self.ai_tick_accumulator >= ai_tick_ms:
+            self.ai_tick_accumulator -= ai_tick_ms
+            if not self._ai_step():
                 return
 
     def _current_tick_ms(self) -> int:
@@ -236,6 +249,12 @@ class SnakeGame:
                 return False
             return True
 
+        if self.ai_snake is not None:
+            if AISystem.check_player_collision_with_ai(self.snake, self.ai_snake):
+                self.stats.add_log("撞到了机器蛇！")
+                self._game_over()
+                return False
+
         for food in self.foods[:]:
             if head.x == food.pos.x and head.y == food.pos.y:
                 RuleSystem.apply_food_effect(food, self.snake, self.stats)
@@ -243,6 +262,26 @@ class SnakeGame:
                 new_food = SpawnSystem.spawn_food(self.snake, self.game_map, self.stats)
                 self.foods.append(new_food)
                 break
+
+        return True
+
+    def _ai_step(self) -> bool:
+        if self.ai_snake is None:
+            return True
+
+        direction = AISystem.choose_direction(self.ai_snake, self.snake, self.game_map)
+        self.ai_snake.set_direction(direction)
+
+        self.ai_snake.move()
+        ai_head = self.ai_snake.head
+
+        ai_head = AISystem.wrap_position(ai_head)
+        self.ai_snake.body[0] = ai_head
+
+        if AISystem.check_collision_with_player(self.ai_snake, self.snake):
+            self.stats.add_log("机器蛇咬到了你的尾部！")
+            self._game_over()
+            return False
 
         return True
 
