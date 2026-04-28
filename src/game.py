@@ -3,9 +3,9 @@ from __future__ import annotations
 import pygame
 from random import random
 
-from .config import GAMEPLAY, SCREEN, ROGUELIKE
+from .config import GAMEPLAY, GRID, SCREEN, ROGUELIKE
 from .events import GameState, MapTileType, EventType
-from .models import RunStats, GameMap, Food
+from .models import RunStats, GameMap, Food, Vec2
 from .systems import (
     DirectionInputBuffer, RuleSystem, SaveSystem, SpawnSystem,
     MapGenerator, UpgradeSystem, EventSystem, DifficultySystem,
@@ -212,6 +212,9 @@ class SnakeGame:
         self.snake.move()
         head = self.snake.head
 
+        head = self._handle_wrapping(head)
+        self.snake.body[0] = head
+
         teleport_dest = self.game_map.get_teleport_destination(head)
         if teleport_dest is not None:
             self.snake.body[0] = teleport_dest.copy()
@@ -220,7 +223,7 @@ class SnakeGame:
                 self.stats.active_boost_left_ms += 2000
             self.stats.add_log("使用传送门")
 
-        if RuleSystem.out_of_bounds(head) or self.game_map.is_blocking(head):
+        if self.game_map.is_blocking(head):
             if RuleSystem.handle_collision(self.snake, self.stats):
                 self._game_over()
                 return False
@@ -242,6 +245,22 @@ class SnakeGame:
                 break
 
         return True
+
+    def _handle_wrapping(self, pos: Vec2) -> Vec2:
+        new_x = pos.x
+        new_y = pos.y
+
+        if pos.x < 0:
+            new_x = GRID.cols - 1
+        elif pos.x >= GRID.cols:
+            new_x = 0
+
+        if pos.y < 0:
+            new_y = GRID.rows - 1
+        elif pos.y >= GRID.rows:
+            new_y = 0
+
+        return Vec2(new_x, new_y)
 
     def _game_over(self) -> None:
         self.state = GameState.GAME_OVER
