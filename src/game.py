@@ -272,16 +272,24 @@ class SnakeGame:
         direction = AISystem.choose_direction(self.ai_snake, self.snake, self.game_map)
         self.ai_snake.set_direction(direction)
 
+        old_body = [Vec2(s.x, s.y) for s in self.ai_snake.body]
+
         self.ai_snake.move()
         ai_head = self.ai_snake.head
 
         ai_head = AISystem.wrap_position(ai_head)
         self.ai_snake.body[0] = ai_head
 
-        if AISystem.check_collision_with_player(self.ai_snake, self.snake):
-            self.stats.add_log("机器蛇咬到了你的尾部！")
-            self._game_over()
-            return False
+        has_collision, is_tail_bite = AISystem.is_any_collision(self.ai_snake, self.snake)
+        
+        if has_collision:
+            if is_tail_bite:
+                self.stats.add_log("机器蛇咬到了你的尾部！")
+                self._game_over()
+                return False
+            else:
+                self.ai_snake.body = old_body
+                return True
 
         return True
 

@@ -567,7 +567,31 @@ class AISystem:
             if seg.x == wrapped_pos.x and seg.y == wrapped_pos.y:
                 return False
         
+        for seg in player_snake.body[:-1]:
+            if seg.x == wrapped_pos.x and seg.y == wrapped_pos.y:
+                return False
+        
         return True
+    
+    @staticmethod
+    def is_any_collision(
+        ai_snake: Snake,
+        player_snake: Snake
+    ) -> tuple[bool, bool]:
+        ai_head = ai_snake.head
+        
+        for i, seg in enumerate(player_snake.body):
+            if ai_head.x == seg.x and ai_head.y == seg.y:
+                if i == len(player_snake.body) - 1:
+                    return (True, True)
+                return (True, False)
+        
+        for ai_seg in ai_snake.body[1:]:
+            for player_seg in player_snake.body:
+                if ai_seg.x == player_seg.x and ai_seg.y == player_seg.y:
+                    return (True, False)
+        
+        return (False, False)
     
     @staticmethod
     def get_distance(pos1: Vec2, pos2: Vec2) -> tuple[int, int]:
@@ -618,7 +642,22 @@ class AISystem:
                     next_pos = ai_snake.head + direction
                     wrapped_next = AISystem.wrap_position(next_pos)
                     
-                    if not game_map.is_blocking(wrapped_next):
+                    has_collision = False
+                    if game_map.is_blocking(wrapped_next):
+                        has_collision = True
+                    
+                    for seg in ai_snake.body[:-1]:
+                        if seg.x == wrapped_next.x and seg.y == wrapped_next.y:
+                            has_collision = True
+                            break
+                    
+                    if not has_collision:
+                        for seg in player_snake.body[:-1]:
+                            if seg.x == wrapped_next.x and seg.y == wrapped_next.y:
+                                has_collision = True
+                                break
+                    
+                    if not has_collision:
                         dist = AISystem.get_manhattan_distance(wrapped_next, target)
                         safe_directions.append((direction, dist))
             
