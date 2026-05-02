@@ -247,6 +247,9 @@ class RunStats:
     selected_upgrade_index: int = 0
     
     pending_event_notification: Optional[ActiveEvent] = None
+    
+    dash_multiplier: float = 1.0
+    last_direction_key_ms: int = 0
 
     def add_log(self, text: str) -> None:
         self.logs.append(text)
@@ -257,6 +260,7 @@ class RunStats:
         multiplier = self.upgrades.permanent_speed_bonus
         if self.active_boost_left_ms > 0:
             multiplier *= 0.8
+        multiplier *= self.dash_multiplier
         return multiplier
 
     def has_narrow_vision(self) -> bool:

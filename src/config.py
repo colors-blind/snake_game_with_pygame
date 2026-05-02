@@ -61,6 +61,10 @@ class GameplayConfig:
     boost_duration_sec: float = 4.0
     boost_tick_bonus_ms: int = 25
     slow_zone_tick_multiplier: float = 1.8
+    dash_max_speed_multiplier: float = 0.5
+    dash_speedup_per_key: float = 0.1
+    dash_decay_rate_per_sec: float = 0.4
+    dash_consecutive_window_ms: int = 350
 
 
 @dataclass(frozen=True)

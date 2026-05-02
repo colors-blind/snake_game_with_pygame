@@ -59,6 +59,8 @@ class SnakeGame:
         self.input_buffer = DirectionInputBuffer()
         self.tick_accumulator = 0
         self.ai_tick_accumulator = 0
+        self.stats.dash_multiplier = 1.0
+        self.stats.last_direction_key_ms = 0
         
         self.stats.add_log(f"进入第 {self.stats.floor} 层")
 
@@ -122,6 +124,12 @@ class SnakeGame:
             if self.stats.has_reverse_controls():
                 direction = DirectionInputBuffer.reverse(direction)
             self.input_buffer.enqueue(direction)
+            
+            time_since_last_key = self.stats.elapsed_ms - self.stats.last_direction_key_ms
+            if time_since_last_key <= GAMEPLAY.dash_consecutive_window_ms:
+                new_multiplier = self.stats.dash_multiplier - GAMEPLAY.dash_speedup_per_key
+                self.stats.dash_multiplier = max(new_multiplier, GAMEPLAY.dash_max_speed_multiplier)
+            self.stats.last_direction_key_ms = self.stats.elapsed_ms
 
     def _handle_upgrade_selection(self, key: int) -> None:
         if key == pygame.K_LEFT:
@@ -163,6 +171,12 @@ class SnakeGame:
 
         if self.stats.active_boost_left_ms > 0:
             self.stats.active_boost_left_ms -= dt
+        
+        time_since_last_key = self.stats.elapsed_ms - self.stats.last_direction_key_ms
+        if time_since_last_key > GAMEPLAY.dash_consecutive_window_ms:
+            decay_amount = GAMEPLAY.dash_decay_rate_per_sec * (dt / 1000.0)
+            new_multiplier = self.stats.dash_multiplier + decay_amount
+            self.stats.dash_multiplier = min(new_multiplier, 1.0)
 
         self.stats.clean_inactive_events()
 
