@@ -22,13 +22,16 @@ class UiRenderer:
         snake: Snake, 
         foods: list[Food], 
         stats: RunStats,
-        game_map: GameMap
+        game_map: GameMap,
+        ai_snake: Snake | None = None
     ) -> None:
         self.screen.fill(THEME.background)
         self._draw_board()
         self._draw_map(game_map, snake, stats)
         self._draw_foods(foods)
         self._draw_snake(snake, stats)
+        if ai_snake is not None:
+            self._draw_ai_snake(ai_snake)
         
         if stats.has_narrow_vision():
             self._draw_fog(snake)
@@ -131,6 +134,28 @@ class UiRenderer:
                 pygame.Rect(x, y, GRID.cell_size - 2, GRID.cell_size - 2),
                 border_radius=4,
             )
+
+    def _draw_ai_snake(self, snake: Snake) -> None:
+        for idx, seg in enumerate(snake.body):
+            x = GRID.margin + seg.x * GRID.cell_size + 1
+            y = GRID.margin + seg.y * GRID.cell_size + 1
+            color = THEME.ai_snake_head if idx == 0 else THEME.ai_snake_body
+            
+            pygame.draw.rect(
+                self.screen,
+                color,
+                pygame.Rect(x, y, GRID.cell_size - 2, GRID.cell_size - 2),
+                border_radius=4,
+            )
+            
+            if idx == 0:
+                pygame.draw.rect(
+                    self.screen,
+                    (255, 255, 255),
+                    pygame.Rect(x, y, GRID.cell_size - 2, GRID.cell_size - 2),
+                    border_radius=4,
+                    width=1
+                )
 
     def _draw_foods(self, foods: list[Food]) -> None:
         for food in foods:

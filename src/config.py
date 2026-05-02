@@ -69,6 +69,8 @@ class ColorTheme:
     board: tuple[int, int, int] = (33, 39, 52)
     snake_head: tuple[int, int, int] = (80, 230, 120)
     snake_body: tuple[int, int, int] = (63, 186, 98)
+    ai_snake_head: tuple[int, int, int] = (255, 80, 80)
+    ai_snake_body: tuple[int, int, int] = (220, 60, 60)
     normal_food: tuple[int, int, int] = (245, 108, 108)
     poison_food: tuple[int, int, int] = (171, 104, 247)
     text_main: tuple[int, int, int] = (230, 232, 240)

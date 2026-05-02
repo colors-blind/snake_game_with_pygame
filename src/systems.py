@@ -510,3 +510,189 @@ def build_snake_with_bonus(length_bonus: int) -> Snake:
     length = GAMEPLAY.initial_snake_length + length_bonus
     body = [Vec2(center_x - i, center_y) for i in range(length)]
     return Snake(body=body, direction=RIGHT)
+
+
+def build_ai_snake(player_snake: Snake) -> Snake:
+    player_head = player_snake.head
+    start_x = (player_head.x + GRID.cols // 2) % GRID.cols
+    start_y = (player_head.y + GRID.rows // 2) % GRID.rows
+    
+    body = [Vec2(start_x - i, start_y) for i in range(3)]
+    return Snake(body=body, direction=RIGHT)
+
+
+class AISystem:
+    DIRECTIONS = [UP, DOWN, LEFT, RIGHT]
+    
+    @staticmethod
+    def get_opposite(direction: Vec2) -> Vec2:
+        if direction == UP:
+            return DOWN
+        if direction == DOWN:
+            return UP
+        if direction == LEFT:
+            return RIGHT
+        return LEFT
+    
+    @staticmethod
+    def wrap_position(pos: Vec2) -> Vec2:
+        new_x = pos.x
+        new_y = pos.y
+        
+        if pos.x < 0:
+            new_x = GRID.cols - 1
+        elif pos.x >= GRID.cols:
+            new_x = 0
+            
+        if pos.y < 0:
+            new_y = GRID.rows - 1
+        elif pos.y >= GRID.rows:
+            new_y = 0
+            
+        return Vec2(new_x, new_y)
+    
+    @staticmethod
+    def is_safe(
+        pos: Vec2,
+        game_map: GameMap,
+        ai_snake: Snake,
+        player_snake: Snake
+    ) -> bool:
+        wrapped_pos = AISystem.wrap_position(pos)
+        
+        if game_map.is_blocking(wrapped_pos):
+            return False
+        
+        for seg in ai_snake.body[:-1]:
+            if seg.x == wrapped_pos.x and seg.y == wrapped_pos.y:
+                return False
+        
+        for seg in player_snake.body[:-1]:
+            if seg.x == wrapped_pos.x and seg.y == wrapped_pos.y:
+                return False
+        
+        return True
+    
+    @staticmethod
+    def is_any_collision(
+        ai_snake: Snake,
+        player_snake: Snake
+    ) -> tuple[bool, bool]:
+        ai_head = ai_snake.head
+        
+        for i, seg in enumerate(player_snake.body):
+            if ai_head.x == seg.x and ai_head.y == seg.y:
+                if i == len(player_snake.body) - 1:
+                    return (True, True)
+                return (True, False)
+        
+        for ai_seg in ai_snake.body[1:]:
+            for player_seg in player_snake.body:
+                if ai_seg.x == player_seg.x and ai_seg.y == player_seg.y:
+                    return (True, False)
+        
+        return (False, False)
+    
+    @staticmethod
+    def get_distance(pos1: Vec2, pos2: Vec2) -> tuple[int, int]:
+        dx = min(
+            abs(pos1.x - pos2.x),
+            abs(pos1.x - pos2.x + GRID.cols),
+            abs(pos1.x - pos2.x - GRID.cols)
+        )
+        dy = min(
+            abs(pos1.y - pos2.y),
+            abs(pos1.y - pos2.y + GRID.rows),
+            abs(pos1.y - pos2.y - GRID.rows)
+        )
+        return dx, dy
+    
+    @staticmethod
+    def get_manhattan_distance(pos1: Vec2, pos2: Vec2) -> int:
+        dx, dy = AISystem.get_distance(pos1, pos2)
+        return dx + dy
+    
+    @staticmethod
+    def choose_direction(
+        ai_snake: Snake,
+        player_snake: Snake,
+        game_map: GameMap
+    ) -> Vec2:
+        if len(player_snake.body) == 0:
+            return ai_snake.direction
+        
+        target = player_snake.body[-1]
+        
+        opposite = AISystem.get_opposite(ai_snake.direction)
+        
+        safe_directions = []
+        for direction in AISystem.DIRECTIONS:
+            if direction == opposite:
+                continue
+            
+            next_pos = ai_snake.head + direction
+            if AISystem.is_safe(next_pos, game_map, ai_snake, player_snake):
+                wrapped_next = AISystem.wrap_position(next_pos)
+                dist = AISystem.get_manhattan_distance(wrapped_next, target)
+                safe_directions.append((direction, dist))
+        
+        if not safe_directions:
+            for direction in AISystem.DIRECTIONS:
+                if direction != opposite:
+                    next_pos = ai_snake.head + direction
+                    wrapped_next = AISystem.wrap_position(next_pos)
+                    
+                    has_collision = False
+                    if game_map.is_blocking(wrapped_next):
+                        has_collision = True
+                    
+                    for seg in ai_snake.body[:-1]:
+                        if seg.x == wrapped_next.x and seg.y == wrapped_next.y:
+                            has_collision = True
+                            break
+                    
+                    if not has_collision:
+                        for seg in player_snake.body[:-1]:
+                            if seg.x == wrapped_next.x and seg.y == wrapped_next.y:
+                                has_collision = True
+                                break
+                    
+                    if not has_collision:
+                        dist = AISystem.get_manhattan_distance(wrapped_next, target)
+                        safe_directions.append((direction, dist))
+            
+            if not safe_directions:
+                return ai_snake.direction
+        
+        safe_directions.sort(key=lambda x: x[1])
+        
+        best_dist = safe_directions[0][1]
+        candidates = [d for d, dist in safe_directions if dist == best_dist]
+        
+        if len(candidates) > 1 and ai_snake.direction in candidates:
+            return ai_snake.direction
+        
+        return choice(candidates)
+    
+    @staticmethod
+    def check_collision_with_player(
+        ai_snake: Snake,
+        player_snake: Snake
+    ) -> bool:
+        ai_head = ai_snake.head
+        if len(player_snake.body) > 0:
+            player_tail = player_snake.body[-1]
+            if ai_head.x == player_tail.x and ai_head.y == player_tail.y:
+                return True
+        return False
+    
+    @staticmethod
+    def check_player_collision_with_ai(
+        player_snake: Snake,
+        ai_snake: Snake
+    ) -> bool:
+        player_head = player_snake.head
+        for seg in ai_snake.body:
+            if player_head.x == seg.x and player_head.y == seg.y:
+                return True
+        return False
